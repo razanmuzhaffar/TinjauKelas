@@ -8,8 +8,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.RecyclerView
-import com.example.tinjaukelas.R
-import com.example.tinjaukelas.Room
+import com.example.tinjaukelas.network.Room
 
 class RoomAdapter(
     private var rooms: List<Room>,
@@ -35,30 +34,23 @@ class RoomAdapter(
     override fun onBindViewHolder(holder: RoomViewHolder, position: Int) {
         val room = rooms[position]
 
-        // Room name
-        holder.tvNamaKelas.text = room.Kelas
+        holder.tvNamaKelas.text = room.name
+        holder.tvKapasitas.text = "Kapasitas: ${room.capacity}"
 
-        // Capacity — placeholder since no capacity column yet
-        holder.tvKapasitas.text = "Kapasitas: ${room.Kapasitas}"
-
-        // roomUsage = false → available (Tersedia)
-        // roomUsage = true  → in use (Digunakan)
-        if (room.Status) {
+        if (room.is_occupied == 1) {
             holder.tvStatusBadge.text = "Digunakan"
-            holder.tvStatusBadge.setBackgroundColor(Color.parseColor("#F44336")) // red
+            holder.tvStatusBadge.setBackgroundColor(Color.parseColor("#F44336"))
         } else {
             holder.tvStatusBadge.text = "Tersedia"
-            holder.tvStatusBadge.setBackgroundColor(Color.parseColor("#4CAF50")) // green
+            holder.tvStatusBadge.setBackgroundColor(Color.parseColor("#4CAF50"))
         }
 
-        // Highlight selected card with light purple
         if (room.id == selectedRoomId) {
             holder.cardView.setCardBackgroundColor(Color.parseColor("#EDE7F6"))
         } else {
             holder.cardView.setCardBackgroundColor(Color.WHITE)
         }
 
-        // Card click — select this room
         holder.cardView.setOnClickListener {
             selectedRoomId = room.id
             notifyDataSetChanged()
@@ -68,7 +60,6 @@ class RoomAdapter(
 
     override fun getItemCount() = rooms.size
 
-    // Call this after any DB change to refresh the list
     fun updateData(newRooms: List<Room>) {
         rooms = newRooms
         notifyDataSetChanged()

@@ -1,0 +1,7 @@
+<resources>
+    <string-array name="status_array">
+        <item>izin</item>
+        <item>sakit</item>
+        <item>alpha</item>
+    </string-array>
+</resources>

@@ -77,19 +77,6 @@
                     android:text="Pilih Kelas untuk Digunakan"
                     android:textColor="@color/white"
                     android:textSize="16sp" />
-
-                <!-- BUTTON ABSEN -->
-                <Button
-                    android:id="@+id/btnAbsen"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:backgroundTint="#30364F"
-                    android:text="Absen"
-                    android:textColor="@color/white"
-                    android:textSize="16sp"
-                    android:visibility="gone" />
-
                 <!-- Button FabAdd -->
                 <com.google.android.material.floatingactionbutton.FloatingActionButton
                     android:id="@+id/fabAdd"

@@ -1,57 +1,63 @@
 package com.example.tinjaukelas
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.tinjaukelas.RoomAdapter
-import com.example.tinjaukelas.Room
-import com.example.tinjaukelas.RoomRepository
+import com.example.tinjaukelas.network.*
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
-import android.view.View
-import android.content.Intent
+import kotlinx.coroutines.launch
+
 class RoomActivity : AppCompatActivity() {
 
-    private lateinit var repository: RoomRepository
     private lateinit var adapter: RoomAdapter
     private lateinit var btnRoomUsage: Button
-    private lateinit var btnAbsen: Button
     private lateinit var recyclerView: RecyclerView
     private lateinit var fabAdd: FloatingActionButton
 
-    private var selectedRoom: Room? = null
+    private var selectedRoom: com.example.tinjaukelas.network.Room? = null
     private var userId: Int = -1
     private var userRole: String = "siswa"
+    private val roomList = mutableListOf<com.example.tinjaukelas.network.Room>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val prefs = getSharedPreferences("session", MODE_PRIVATE)
+        val prefs = getSharedPreferences("auth", MODE_PRIVATE)
         userId = prefs.getInt("userId", -1)
         userRole = prefs.getString("userRole", "siswa") ?: "siswa"
 
-        repository = RoomRepository(this)
+        val userName = prefs.getString("userName", "User") ?: "User"
+        findViewById<TextView>(R.id.tvUsername).text = userName
+
         btnRoomUsage = findViewById(R.id.btnRoomUsage)
-        btnAbsen = findViewById(R.id.btnAbsen)
         recyclerView = findViewById(R.id.recyclerView)
         fabAdd = findViewById(R.id.fabAdd)
-        findViewById<Button>(R.id.btnLogout).setOnClickListener { logout() }
 
         fabAdd.visibility = if (userRole == "admin") View.VISIBLE else View.GONE
+
+        findViewById<Button>(R.id.btnLogout).setOnClickListener { logout() }
 
         setupRecyclerView()
         loadRooms()
         setupButtons()
     }
 
+    private fun getToken() =
+        "Bearer ${getSharedPreferences("auth", MODE_PRIVATE).getString("token", "")}"
+
     private fun setupRecyclerView() {
-        adapter = RoomAdapter(emptyList()) { room ->
+        adapter = RoomAdapter(roomList) { room ->
             selectedRoom = room
             updateButtonState(room)
         }
@@ -60,13 +66,26 @@ class RoomActivity : AppCompatActivity() {
     }
 
     private fun loadRooms() {
-        val rooms = repository.getAllRooms()
-        adapter.updateData(rooms)
+        lifecycleScope.launch {
+            try {
+                val res = RetrofitClient.instance.getRooms(getToken())
+                if (res.isSuccessful) {
+                    roomList.clear()
+                    roomList.addAll(res.body() ?: emptyList())
+                    adapter.notifyDataSetChanged()
+                } else if (res.code() == 401) {
+                    startActivity(Intent(this@RoomActivity, LoginActivity::class.java))
+                    finish()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@RoomActivity, "Gagal memuat ruangan: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
-    private fun updateButtonState(room: Room) {
+    private fun updateButtonState(room: com.example.tinjaukelas.network.Room) {
         btnRoomUsage.isEnabled = true
-        if (room.Status) {
+        if (room.is_occupied == 1) {
             btnRoomUsage.text = "Kosongkan Ruangan"
             btnRoomUsage.backgroundTintList =
                 android.content.res.ColorStateList.valueOf(
@@ -84,57 +103,55 @@ class RoomActivity : AppCompatActivity() {
     private fun setupButtons() {
         btnRoomUsage.setOnClickListener {
             val room = selectedRoom ?: return@setOnClickListener
-            if (!room.Status) {
-                val activeRoom = repository.getActiveRoomByUser(userId)
-                if (activeRoom != null) {
-                    Toast.makeText(
-                        this,
-                        "Kamu masih menempati ${activeRoom.Kelas}, keluar dulu!",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@setOnClickListener
+            val newStatus = if (room.is_occupied == 1) 0 else 1
+
+            lifecycleScope.launch {
+                try {
+                    val res = RetrofitClient.instance.updateRoomStatus(
+                        getToken(), room.id, UpdateRoomRequest(newStatus == 1)
+                    )
+                    if (res.isSuccessful) {
+                        selectedRoom = room.copy(is_occupied = newStatus)
+                        Toast.makeText(
+                            this@RoomActivity,
+                            if (newStatus == 1) "${room.name} sedang digunakan"
+                            else "${room.name} sudah kosong",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        loadRooms()
+                        updateButtonState(selectedRoom!!)
+                    } else if (res.code() == 422 || res.code() == 403) {
+                        val error = res.errorBody()?.string()
+                        val msg = try {
+                            org.json.JSONObject(error ?: "{}").optString("message", "Gagal")
+                        } catch (e: Exception) {
+                            "Gagal"
+                        }
+                        Toast.makeText(this@RoomActivity, msg, Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this@RoomActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
-            val newStatus = !room.Status
-            repository.updateRoomStatusAndUser(room.id, newStatus, userId)
-            selectedRoom = room.copy(Status = newStatus)
-            Toast.makeText(
-                this,
-                if (newStatus) "${room.Kelas} sedang digunakan"
-                else "${room.Kelas} sudah kosong",
-                Toast.LENGTH_SHORT
-            ).show()
-            loadRooms()
-            updateButtonState(selectedRoom!!)
         }
 
         fabAdd.setOnClickListener {
             showAddRoomDialog()
         }
-
-        btnAbsen.setOnClickListener {
-            //TODO: implementasi absensi untuk guru
-            //val intent = Intent(this, AbsenActivity::class.java)
-            //intent.putExtra("guruId", userId)
-            //startActivity(intent)
-            Toast.makeText(this, "Fitur absensi belum tersedia", Toast.LENGTH_SHORT).show()
-        }
     }
-
 
     private fun showAddRoomDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialogform, null)
         val etNama = dialogView.findViewById<TextInputEditText>(R.id.etNama)
         val btnBatal = dialogView.findViewById<Button>(R.id.btnBatal)
         val btnSimpan = dialogView.findViewById<Button>(R.id.btnSimpan)
+
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
             .create()
 
-        btnBatal.setOnClickListener {
-            dialog.dismiss()
-        }
+        btnBatal.setOnClickListener { dialog.dismiss() }
 
         btnSimpan.setOnClickListener {
             val nama = etNama.text.toString().trim()
@@ -142,20 +159,28 @@ class RoomActivity : AppCompatActivity() {
                 etNama.error = "Nama tidak boleh kosong"
                 return@setOnClickListener
             }
-            val newRoom = Room(Kelas = nama, Status = false, userId = userId, Kapasitas = 0)
-            repository.insertRoom(newRoom)
-            Toast.makeText(this, "$nama berhasil ditambahkan", Toast.LENGTH_SHORT).show()
-            dialog.dismiss()
-            loadRooms()
+            lifecycleScope.launch {
+                try {
+                    val res = RetrofitClient.instance.createRoom(
+                        getToken(), CreateRoomRequest(nama)
+                    )
+                    if (res.isSuccessful) {
+                        Toast.makeText(this@RoomActivity, "$nama berhasil ditambahkan", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        loadRooms()
+                    } else {
+                        Toast.makeText(this@RoomActivity, "Gagal: ${res.code()}", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this@RoomActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
         dialog.show()
     }
 
     private fun logout() {
-        getSharedPreferences("session", MODE_PRIVATE)
-            .edit()
-            .clear()
-            .apply()
+        getSharedPreferences("auth", MODE_PRIVATE).edit().clear().apply()
         val intent = Intent(this, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
