@@ -64,7 +64,7 @@
                     android:background="@color/white"
                     android:contentDescription="Banner Image"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/ic_launcher_foreground" />
+                    android:src="@drawable/denahsmkn4" />
 
                 <!-- BUTTON GUNAKAN RUANGAN -->
                 <Button
