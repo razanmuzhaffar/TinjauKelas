@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     tools:context=".MainActivity">
 
     <!-- ── BACKGROUND IMAGE (full screen) ── -->
@@ -51,9 +52,11 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_badge_lightcream"
+                android:background="@color/white"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="16dp"
+
+                >
 
                 <!-- IMAGE BANNER -->
                 <ImageView
@@ -82,8 +85,11 @@
                     android:id="@+id/fabAdd"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:src="@drawable/ic_school"
-                    android:contentDescription="Tambah Ruangan" />
+                    android:src="@drawable/ic_add"
+                    app:tint ="#FFF"
+                    android:contentDescription="Tambah Ruangan"
+                    android:backgroundTint="@color/navy"
+                    />
 
                 <!-- LABEL DAFTAR KELAS -->
                 <TextView
